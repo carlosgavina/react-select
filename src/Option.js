@@ -30,13 +30,15 @@ var Option = React.createClass({
 		var renderedLabel = this.props.renderFunc(obj);
 		var optionClasses = classes(this.props.className, obj.className);
 
-		return obj.disabled ? (
+		var renderDisabled = (
 			<div className={optionClasses}
 				onMouseDown={this.blockEvent}
 				onClick={this.blockEvent}>
 				{renderedLabel}
 			</div>
-		) : (
+		);
+
+		var renderEnabled = (
 			<div className={optionClasses}
 				style={obj.style}
 				onMouseEnter={this.props.mouseEnter}
@@ -47,6 +49,8 @@ var Option = React.createClass({
 				{ obj.create ? this.props.addLabelText.replace('{label}', obj.label) : renderedLabel }
 			</div>
 		);
+
+		return obj.disabled ? renderDisabled : ( obj.create && this.props.addLabelText && this.props.addLabelText.length > 0 ? renderEnabled : ( !obj.create ? renderEnabled : null ) );
 	}
 });
 

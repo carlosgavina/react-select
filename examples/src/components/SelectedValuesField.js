@@ -28,6 +28,7 @@ var SelectedValuesField = React.createClass({
 				<h3 className="section-heading">{this.props.label}</h3>
 				<Select
 					allowCreate={this.props.allowCreate}
+					addLabelText={this.props.addLabelText}
 					onOptionLabelClick={this.onLabelClick}
 					value={this.props.options.slice(1,3)}
 					multi
