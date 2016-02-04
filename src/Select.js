@@ -37,6 +37,7 @@ var Select = React.createClass({
 		labelKey: React.PropTypes.string,          // path of the label value in option objects
 		matchPos: React.PropTypes.string,          // (any|start) match the start or entire string when filtering
 		matchProp: React.PropTypes.string,         // (any|label|value) which option property to filter on
+		max: React.PropTypes.number,
 		multi: React.PropTypes.bool,               // multi-value input
 		name: React.PropTypes.string,              // field name, for hidden <input /> tag
 		newOptionCreator: React.PropTypes.func,    // factory to create new options when allowCreate set
@@ -80,6 +81,7 @@ var Select = React.createClass({
 			labelKey: 'label',
 			matchPos: 'any',
 			matchProp: 'any',
+			max: undefined,
 			name: undefined,
 			newOptionCreator: undefined,
 			noResultsText: 'No results found',
@@ -219,6 +221,19 @@ var Select = React.createClass({
 
 	focus () {
 		this.getInputNode().focus();
+	},
+
+	getValueCount () {
+		return this.state && this.state.values ? this.state.values.length : 0;
+	},
+
+	didReachMax () {
+		if ( this.props.max ) {
+			if ( this.getValueCount() >= this.props.max ) {
+				return true;
+			}
+		}
+		return false;
 	},
 
 	clickedOutsideElement (element, event) {
@@ -372,28 +387,38 @@ var Select = React.createClass({
 		event.stopPropagation();
 		event.preventDefault();
 
-		// for the non-searchable select, close the dropdown when button is clicked
-		if (this.state.isOpen && !this.props.searchable) {
-			this.setState({
-				isOpen: false
-			}, this._unbindCloseMenuIfClickedOutside);
-			return;
+		if ( !this.didReachMax() ) {
+
+			// for the non-searchable select, close the dropdown when button is clicked
+			if (this.state.isOpen && !this.props.searchable) {
+				this.setState({
+					isOpen: false
+				}, this._unbindCloseMenuIfClickedOutside);
+				return;
+			}
+
+			if (this.state.isFocused) {
+				this.setState({
+					isOpen: true
+				}, this._bindCloseMenuIfClickedOutside);
+			} else {
+				this._openAfterFocus = true;
+				this.getInputNode().focus();
+			}
+
+		} else {
+			if (!this.state.isFocused) {
+				this._openAfterFocus = true;
+				this.getInputNode().focus();
+			}
 		}
 
-		if (this.state.isFocused) {
-			this.setState({
-				isOpen: true
-			}, this._bindCloseMenuIfClickedOutside);
-		} else {
-			this._openAfterFocus = true;
-			this.getInputNode().focus();
-		}
 	},
 
 	handleMouseDownOnMenu (event) {
 		// if the event was triggered by a mousedown and not the primary
 		// button, or if the component is disabled, ignore it.
-		if (this.props.disabled || (event.type === 'mousedown' && event.button !== 0)) {
+		if (this.props.disabled || (event.type === 'mousedown' && event.button !== 0) || this.didReachMax() ) {
 			return;
 		}
 		event.stopPropagation();
@@ -403,13 +428,21 @@ var Select = React.createClass({
 	handleMouseDownOnArrow (event) {
 		// if the event was triggered by a mousedown and not the primary
 		// button, or if the component is disabled, ignore it.
-		if (this.props.disabled || (event.type === 'mousedown' && event.button !== 0)) {
+		if (this.props.disabled || (event.type === 'mousedown' && event.button !== 0) ) {
 			return;
 		}
+
+		if ( this.didReachMax() ) {
+			event.stopPropagation();
+			event.preventDefault();
+			return;
+		}
+
 		// If not focused, handleMouseDown will handle it
 		if (!this.state.isOpen) {
 			return;
 		}
+
 		event.stopPropagation();
 		event.preventDefault();
 		this.setState({
@@ -419,6 +452,11 @@ var Select = React.createClass({
 
 	handleInputFocus (event) {
 		var newIsOpen = this.state.isOpen || this._openAfterFocus;
+
+		if ( this.didReachMax() ) {
+			newIsOpen = false;
+		}
+
 		this.setState({
 			isFocused: true,
 			isOpen: newIsOpen
@@ -445,53 +483,68 @@ var Select = React.createClass({
 			});
 		}, 50);
 		if (this.props.onBlur) {
-			this.props.onBlur(event);
+			this.props.onBlur(event, this.state.inputValue);
 		}
 	},
 
 	handleKeyDown (event) {
 		if (this.props.disabled) return;
-		switch (event.keyCode) {
-			case 8: // backspace
-				if (!this.state.inputValue && this.props.backspaceRemoves) {
-					event.preventDefault();
-					this.popValue();
-				}
-			return;
-			case 9: // tab
-				if (event.shiftKey || !this.state.isOpen || !this.state.focusedOption) {
-					return;
-				}
-				this.selectFocusedOption();
-			break;
-			case 13: // enter
-				if (!this.state.isOpen) return;
-				this.selectFocusedOption();
-			break;
-			case 27: // escape
-				if (this.state.isOpen) {
-					this.resetValue();
-				} else if (this.props.clearable) {
-					this.clearValue(event);
-				}
-			break;
-			case 38: // up
-				this.focusPreviousOption();
-			break;
-			case 40: // down
-				this.focusNextOption();
-			break;
-			case 188: // ,
-				if (this.props.allowCreate && this.props.multi) {
-					event.preventDefault();
-					event.stopPropagation();
+
+		if ( !this.didReachMax() ) {
+			switch (event.keyCode) {
+				case 8: // backspace
+					if (!this.state.inputValue && this.props.backspaceRemoves) {
+						event.preventDefault();
+						this.popValue();
+					}
+				return;
+				case 9: // tab
+					if (event.shiftKey || !this.state.isOpen || !this.state.focusedOption) {
+						return;
+					}
 					this.selectFocusedOption();
-				} else {
-					return;
-				}
-			break;
-			default: return;
+				break;
+				case 13: // enter
+					if (!this.state.isOpen) return;
+					this.selectFocusedOption();
+				break;
+				case 27: // escape
+					if (this.state.isOpen) {
+						this.resetValue();
+					} else if (this.props.clearable) {
+						this.clearValue(event);
+					}
+				break;
+				case 38: // up
+					this.focusPreviousOption();
+				break;
+				case 40: // down
+					this.focusNextOption();
+				break;
+				case 188: // ,
+					if (this.props.allowCreate && this.props.multi) {
+						event.preventDefault();
+						event.stopPropagation();
+						this.selectFocusedOption();
+					} else {
+						return;
+					}
+				break;
+				default: return;
+			}
+		} else {
+			switch (event.keyCode) {
+				case 8: // backspace
+					if (!this.state.inputValue && this.props.backspaceRemoves) {
+						event.preventDefault();
+						this.popValue();
+					}
+				return;
+				default:
+				break;
+			}
 		}
+
 		event.preventDefault();
 	},
 
@@ -793,7 +846,8 @@ var Select = React.createClass({
 			'is-focused': this.state.isFocused,
 			'is-loading': this.isLoading(),
 			'is-disabled': this.props.disabled,
-			'has-value': this.state.value
+			'has-value': this.state.value,
+			'has-reached-max' : this.didReachMax()
 		});
 		var value = [];
 		if (this.props.multi) {
