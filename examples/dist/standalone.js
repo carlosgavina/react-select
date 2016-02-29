@@ -109,6 +109,7 @@ var Select = React.createClass({
 		matchPos: React.PropTypes.string, // (any|start) match the start or entire string when filtering
 		matchProp: React.PropTypes.string, // (any|label|value) which option property to filter on
 		max: React.PropTypes.number,
+		maxChars: React.PropTypes.number,
 		multi: React.PropTypes.bool, // multi-value input
 		name: React.PropTypes.string, // field name, for hidden <input /> tag
 		newOptionCreator: React.PropTypes.func, // factory to create new options when allowCreate set
@@ -153,6 +154,7 @@ var Select = React.createClass({
 			matchPos: 'any',
 			matchProp: 'any',
 			max: undefined,
+			maxChars: undefined,
 			name: undefined,
 			newOptionCreator: undefined,
 			noResultsText: 'No results found',
@@ -297,13 +299,33 @@ var Select = React.createClass({
 		this.getInputNode().focus();
 	},
 
+	getCharValueCount: function getCharValueCount() {
+		var input = this.getInputNode(),
+		    totalVal = '',
+		    len;
+
+		if (this.state.value && this.state.value.length) {
+			totalVal = this.state.value.replace(',', '');
+		}
+		if (input && input.props.value && input.props.value.length) {
+			totalVal += input.props.value;
+		}
+
+		len = totalVal.length;
+
+		return len > 10;
+	},
+
 	getValueCount: function getValueCount() {
 		return this.state && this.state.values ? this.state.values.length : 0;
 	},
 
 	didReachMax: function didReachMax() {
-		if (this.props.max) {
-			if (this.getValueCount() >= this.props.max) {
+		if (this.props.max || this.props.maxChars) {
+			if (this.props.max && this.getValueCount() >= this.props.max) {
+				return true;
+			}
+			if (this.props.maxChars && this.getCharValueCount() >= this.props.maxChars) {
 				return true;
 			}
 		}
@@ -556,6 +578,36 @@ var Select = React.createClass({
 		}, 50);
 		if (this.props.onBlur) {
 			this.props.onBlur(event, this.state.inputValue);
+		}
+	},
+
+	handleKeyUp: function handleKeyUp(event) {
+		if (this.props.disabled) return;
+
+		if (this.didReachMax()) {
+			switch (event.keyCode) {
+				case 8:
+					// backspace
+					if (!this.state.inputValue && this.props.backspaceRemoves) {
+						event.preventDefault();
+						this.popValue();
+					}
+				case 13:
+					// enter
+					if (!this.state.isOpen) return;
+					this.selectFocusedOption();
+					return;
+				case 27:
+					// escape
+					if (this.state.isOpen) {
+						this.resetValue();
+					} else if (this.props.clearable) {
+						this.clearValue(event);
+					}
+					break;
+				default:
+					break;
+			}
 		}
 	},
 
@@ -1048,7 +1100,7 @@ var Select = React.createClass({
 			React.createElement('input', { type: 'hidden', ref: 'value', name: this.props.name, value: this.state.value, disabled: this.props.disabled }),
 			React.createElement(
 				'div',
-				{ className: 'Select-control', ref: 'control', onKeyDown: this.handleKeyDown, onMouseDown: this.handleMouseDown, onTouchEnd: this.handleMouseDown },
+				{ className: 'Select-control', ref: 'control', onKeyDown: this.handleKeyDown, onKeyUp: this.handleKeyUp, onMouseDown: this.handleMouseDown, onTouchEnd: this.handleMouseDown },
 				value,
 				input,
 				loading,
