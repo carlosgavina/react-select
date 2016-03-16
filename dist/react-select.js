@@ -153,8 +153,8 @@ var Select = React.createClass({
 			labelKey: 'label',
 			matchPos: 'any',
 			matchProp: 'any',
-			max: undefined,
-			maxChars: undefined,
+			max: 30,
+			maxChars: 1000,
 			name: undefined,
 			newOptionCreator: undefined,
 			noResultsText: 'No results found',
@@ -313,7 +313,7 @@ var Select = React.createClass({
 
 		len = totalVal.length;
 
-		return len > 10;
+		return len;
 	},
 
 	getValueCount: function getValueCount() {
